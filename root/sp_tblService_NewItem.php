@@ -1,18 +1,22 @@
-<?php  
-        include "getSRDetails.php";
-?>        
-<?php  
-        include "dbconnect.php";
-        date_default_timezone_set('America/New_York');
+<?php
+        // Server-side code to update service report and to add expense and task lines
 
-        // Add Service Line
+        // establish connection
+        include "dbconnect.php";
+        // set timezone 
+        date_default_timezone_set('America/New_York');
+        // get Service Report data 
+        include "getSRDetails.php";
+        // query to get orderID from selected order number 
         $tsql1 = "SELECT OrderID FROM dbo.tblCustOrders where OrderNo = ?";
         $getName1 = sqlsrv_query($conn, $tsql1, array($_POST['ordernos']));
+
         if( $getName1 === false )  
                 die( FormatErrors( sqlsrv_errors() ) );  
         if ( sqlsrv_fetch( $getName1 ) === false )  
                 die( FormatErrors( sqlsrv_errors() ) ); 
         
+        // getting form data        
         $input_OrderID = sqlsrv_get_field( $getName1, 0); 
         $today = date("Y-m-d H:i:s");
         $input_ServiceID = $_POST['ServiceID'];
@@ -26,10 +30,10 @@
         $responseMessage = "Success"; 
         $NewServiceID = 1;  
 
+        // calling stored procedure sp_tblService_SaveItem
         $sql_ServiceLine = "{call sp_tblService_SaveItem(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)};";
-       
+        // pushing data to array 
         $params_ServiceLine = array();
-
         array_push($params_ServiceLine,array($input_ServiceID, SQLSRV_PARAM_IN),
                             array($EmployeeID, SQLSRV_PARAM_IN), 
                             array($input_ServiceDate, SQLSRV_PARAM_IN),
@@ -52,19 +56,18 @@
                             array(&$responseMessage, SQLSRV_PARAM_INOUT),
                             array(&$NewServiceID, SQLSRV_PARAM_INOUT));
 
+        // executing query
         $stmt_ServiceLine = sqlsrv_query( $conn, $sql_ServiceLine, $params_ServiceLine);  
-        if( $stmt_ServiceLine === false )  
-        {  
+        if( $stmt_ServiceLine === false ) {  
             echo "Error in executing statement 3.\n";  
             die( print_r( sqlsrv_errors(), true));  
         }  
 
+        // free statement 
         sqlsrv_next_result($stmt_ServiceLine); 
         sqlsrv_free_stmt( $stmt_ServiceLine); 
 
-
-        // Add Expense Line
-
+        // getting form data for expense lines
         $input_expID = $_POST['expID'];             
         $input_exptype = $_POST['exptype'];
         $input_expamount = $_POST["expamount"];
@@ -74,91 +77,72 @@
         $input_check3 = $_POST['check3'];
         $input_expnotes = &$_POST['expnotes'];
 
+        // get markup percentage based on selected expense type 
         $input_markuppercent = array();
         foreach ($input_exptype as &$value) {
-            $sql = "SELECT MarkupPercent FROM dbo.tblServiceExpenses where ExpenseID ='".$value."'";
-                            
+                $sql = "SELECT MarkupPercent FROM dbo.tblServiceExpenses where ExpenseID ='".$value."'";
 	        $stmt = sqlsrv_query( $conn, $sql);
 	        if( $stmt === false ) {
 	        	die( print_r( sqlsrv_errors(), true));
 	        }
-
-	        // Make the first (and in this case, only) row of the result set available for reading.
 	        if( sqlsrv_fetch( $stmt ) === false) {
 	        	die( print_r( sqlsrv_errors(), true));
 	        }
 
-	        // Get the row fields. Field indices start at 0 and must be retrieved in order.
-	        // Retrieving row fields by name is not supported by sqlsrv_get_field.
 	        $mp = sqlsrv_get_field( $stmt, 0);
 	        array_push($input_markuppercent,$mp);
         }
 
+        // executing query
         $sql_ExpenseLine = "";  
         $params_ExpenseLine = array();     
         for($index = 0 ; $index < count($input_exptype); $index ++){
-                // if($input_expID[$index] != 0){
-                     $sql_ExpenseLine .= "UPDATE tblServiceExpenseLines 
-                                          SET ExpenseID = (?),
-                                              Amount = (?),
-                                              CurrencyID = (?),
-                                              AFACreditCard = (?),
-                                              Receipt = (?),
-                                              Notes = (?),
-                                              Billable = (?),
-                                              MarkupPercent = (?)
-                                          WHERE ServiceExpenseLineID ='".$input_expID[$index]."';";
-                // }
-                // else{
-                //         $tsql_callSP1 .= "{call sp_InserttblServiceExpenseLines(?,?,?,?,?,?,?,?,?)};";
-                // }
+                $sql_ExpenseLine .= "UPDATE tblServiceExpenseLines 
+                                     SET ExpenseID = (?),
+                                         Amount = (?),
+                                         CurrencyID = (?),
+                                         AFACreditCard = (?),
+                                         Receipt = (?),
+                                         Notes = (?),
+                                         Billable = (?),
+                                         MarkupPercent = (?)
+                                     WHERE ServiceExpenseLineID ='".$input_expID[$index]."';";
             }
-
+        // pushing data to array 
         for($index = 0 ; $index < count($input_exptype); $index ++){
-        //     if($input_expID[$index] != 0){
-                array_push($params_ExpenseLine,$input_exptype[$index],
-                                     $input_expamount[$index],
-                                     $input_expcurr[$index],
-                                     $input_check1[$index],
-                                     $input_check2[$index],
-                                     $input_expnotes[$index],
-                                     $input_check3[$index],
-                                     $input_markuppercent[$index]
-                                     );
-        //     }
-        //     else{
-        //         array_push($params11,array($ServiceID, SQLSRV_PARAM_IN),
-        //                                 array($input_exptype[$index], SQLSRV_PARAM_IN), 
-        //                                 array($input_expamount[$index], SQLSRV_PARAM_IN),
-        //                                 array($input_expcurr[$index], SQLSRV_PARAM_IN),
-        //                                 array($input_check1[$index], SQLSRV_PARAM_IN),
-        //                                 array($input_check2[$index], SQLSRV_PARAM_IN),
-        //                                 array($input_markuppercent[$index], SQLSRV_PARAM_IN),
-        //                                 array($input_check3[$index], SQLSRV_PARAM_IN),
-        //                                 array($input_expnotes[$index], SQLSRV_PARAM_IN));
-        //     }
+                array_push($params_ExpenseLine, $input_exptype[$index],
+                                                $input_expamount[$index],
+                                                $input_expcurr[$index],
+                                                $input_check1[$index],
+                                                $input_check2[$index],
+                                                $input_expnotes[$index],
+                                                $input_check3[$index],
+                                                $input_markuppercent[$index]
+                        );
         }
-
+        // executing query
         $stmt_ExpenseLine = sqlsrv_query( $conn, $sql_ExpenseLine, $params_ExpenseLine);  
-        if( $stmt_ExpenseLine === false )  
-        {  
+        if( $stmt_ExpenseLine === false ){  
             echo "Error in executing statement 3.\n";  
             die( print_r( sqlsrv_errors(), true));  
         }  
 
+        // free statement 
         sqlsrv_next_result($stmt_ExpenseLine); 
         sqlsrv_free_stmt( $stmt_ExpenseLine); 
 
 
-        // Add Task Line
+        // getting form data for task lines
         $input_taskID = $_POST['taskID']; 
         $input_tasktype = $_POST['tasktype'];
         $input_taskhours = $_POST['taskhours'];
         $input_tasknotes = $_POST['tasknotes'];
 
+        // executing query
         $sql_TaskLine = "";
         $params_TaskLine = array(); 
         for($index = 0 ; $index < count($input_tasktype); $index ++){
+                // if task line exists, update with new data 
                 if($input_taskID[$index] != 0){
                         $sql_TaskLine .= "UPDATE tblServiceTaskLines 
                                           SET TaskID = (?),
@@ -166,11 +150,12 @@
                                               Notes = (?)
                                           WHERE ServiceTaskLineID ='".$input_taskID[$index]."';";
                 }
+                // if task line does not exists, create new task line by calling stoed procedure sp_InserttblServiceTaskLines
                 else{
                         $sql_TaskLine .= "{call sp_InserttblServiceTaskLines(?,?,?,?)};";
                 }
         }
-
+        // pushing data to array 
         for($index = 0 ; $index < count($input_tasktype); $index ++){
                 if($input_taskID[$index] != 0){
                         array_push($params_TaskLine,$input_tasktype[$index],
@@ -186,35 +171,17 @@
                 }
         }
 
+        // executing query
         $stmt_TaskLine = sqlsrv_query( $conn, $sql_TaskLine, $params_TaskLine);  
-        if( $stmt_TaskLine === false )  
-        {  
+        if( $stmt_TaskLine === false ){  
             echo "Error in executing statement 3.\n";  
             die( print_r( sqlsrv_errors(), true));  
         }  
-
+        // free statement 
         sqlsrv_next_result($stmt_TaskLine); 
         sqlsrv_free_stmt( $stmt_TaskLine);
 
-
-
-        // $uploaddir = '../uploads/expenselines/';
-        // // $uploadfile = $uploaddir . basename("$_FILES['userfile']['name']");
-        // $temp = explode(".", $_FILES["di"]["name"]);
-        // $newfilename = $uploaddir .round(microtime(true)) . '.' . end($temp);
-        // echo "<p>";
-
-        // if (move_uploaded_file($_FILES['di']['tmp_name'], $newfilename)) {
-        // echo "File is valid, and was successfully uploaded.\n";
-        // } else {
-        // echo "Upload failed";
-        // }
-        // echo "</p>";
-        // echo '<pre>';
-        // echo 'Here is some more debugging info:';
-        // print_r($_FILES);
-        // print "</pre>";
-
+        // script to upload expense receipt image to \\team\wwwroot\ExpenseLineFiles
         $uploaddir = '../../ExpenseLineFiles/';
         $files = array_filter($_FILES['file']['name']);
 
@@ -223,24 +190,26 @@
                 $tmpFilePath = $_FILES['file']['tmp_name'][$i];
                 //A file path needs to be present
                 if ($tmpFilePath != ""){
-                   //Setup our new file path
-                   $temp = explode(".", $_FILES["file"]["name"][$i]);
-                   $newFilePath = $uploaddir. $input_expID[$i]. '.jpg' ;
-                   //File is uploaded to temp dir
-                   echo "<p>";
-                   if(move_uploaded_file($tmpFilePath, $newFilePath)) {
-                        echo "File is valid, and was successfully uploaded.\n";
-                        } else {
+                        //Setup our new file path
+                        $temp = explode(".", $_FILES["file"]["name"][$i]);
+                        $newFilePath = $uploaddir. $input_expID[$i]. '.jpg' ;
+                        //File is uploaded to temp dir
+                        echo "<p>";
+                        if(move_uploaded_file($tmpFilePath, $newFilePath)) {
+                                echo "File is valid, and was successfully uploaded.\n";
+                                } 
+                        else {
                         echo "Upload failed";
-                   }
-                   echo "</p>";
-                   echo '<pre>';
-                   echo 'Here is some more debugging info:';
-                   print_r($_FILES);
-                   print "</pre>";
+                        }
+                        echo "</p>";
+                        echo '<pre>';
+                        echo 'Here is some more debugging info:';
+                        print_r($_FILES);
+                        print "</pre>";
                 }
         } 
 
+        // if submit button is clicked, set submitted field in table tblService equals 1
         if (isset($_POST['submit'])) {
                 $sql_submit = "UPDATE tblService SET Submitted = (?) WHERE ServiceID ='".$input_ServiceID."';";
                 $params_submit = array(1); 
@@ -255,6 +224,7 @@
                 header("Location: /ServiceReport/root/dashboard.php", true, 301);
                 exit();
         }
+        // if ssave and exit button is clicked, redirect to dashboard
         else{
                 sqlsrv_close( $conn);
                 header("Location: /ServiceReport/root/dashboard.php", true, 301);

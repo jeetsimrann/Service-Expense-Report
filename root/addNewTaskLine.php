@@ -1,3 +1,4 @@
+<!-- html code to add new task lines -->
 <div class="card-body">
     <div class="form-group mb-3 inputfield">
         <label for="tasktype">Task Type</label>

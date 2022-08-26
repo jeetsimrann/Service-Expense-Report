@@ -1,14 +1,19 @@
 <?php
-session_start();
-?>
-<?php
-        require "dbconnect.php";
-        $sqlupdt = "SELECT * FROM dbo.tblService 
-                  INNER JOIN dbo.tblCustOrders ON dbo.tblService.OrderID = dbo.tblCustOrders.OrderID 
-                  INNER JOIN dbo.tblCustomers ON dbo.tblCustOrders.CustID = dbo.tblCustomers.CustID
-                  WHERE ServiceID=".$_COOKIE["SRID"];
-        $resultupdt = sqlsrv_query($conn,$sqlupdt) or die("Couldn't execut query");
-        while ($dataupdt=sqlsrv_fetch_array($resultupdt, SQLSRV_FETCH_ASSOC)){
+    // Server-side code to get service report data
+
+    // session started
+    session_start();
+    // establish connection 
+    require "dbconnect.php";
+    // query to retrieve Service Report
+    $sqlupdt = "SELECT * FROM dbo.tblService 
+              INNER JOIN dbo.tblCustOrders ON dbo.tblService.OrderID = dbo.tblCustOrders.OrderID 
+              INNER JOIN dbo.tblCustomers ON dbo.tblCustOrders.CustID = dbo.tblCustomers.CustID
+              WHERE ServiceID=".$_COOKIE["SRID"];
+    // executing query
+    $result = sqlsrv_query($conn,$sqlupdt) or die("Couldn't execut query");
+    // assigning fetched data to variables
+    while ($dataupdt=sqlsrv_fetch_array($result, SQLSRV_FETCH_ASSOC)){
         $ServiceID = $dataupdt['ServiceID'];
         $ServiceDate = date_format($dataupdt['ServiceDate'], 'Y-m-d');
         $OrderNo = $dataupdt['OrderNo'];
